@@ -16,10 +16,10 @@ if uploaded_file is not None:
     # Read uploaded Excel
     df = pd.read_excel(uploaded_file)
     
-    st.subheader("👀 Preview of Uploaded Data")
+    st.subheader("Preview of Uploaded Data")
     st.dataframe(df.head(), width='stretch')
 
-    st.subheader("🧩 Select Columns for the Report")
+    st.subheader("Select Columns for the Report")
     all_columns = list(df.columns)
     selected_columns = st.multiselect(
         "Choose the columns you want in your Summary sheet:",
