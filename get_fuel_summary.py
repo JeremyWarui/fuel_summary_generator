@@ -4,9 +4,44 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 RECEIPT_STATUS_COLUMN = "Receipt_Status"
 RECEIPT_STATUS_OPTIONS = ("Missing", "Okay")
+TABLE_STYLE = "TableStyleMedium2"
+NUMBER_COLUMNS = ("Quantity", "Amount_incl_Tax")
+NUMBER_FORMAT = "#,##0.00"
+
+
+def style_as_table(worksheet, dataframe, table_name):
+    """Format a sheet written from dataframe as a blue banded Excel table with fitted columns."""
+    last_col = get_column_letter(len(dataframe.columns))
+    # An Excel table needs at least one body row, even an empty one.
+    last_row = max(len(dataframe) + 1, 2)
+    table = Table(displayName=table_name, ref=f"A1:{last_col}{last_row}")
+    table.tableStyleInfo = TableStyleInfo(
+        name=TABLE_STYLE, showRowStripes=True, showColumnStripes=False
+    )
+    worksheet.add_table(table)
+
+    # pandas styles headers itself; clearing that lets the table style colour them.
+    for cell in worksheet[1]:
+        cell.style = "Normal"
+
+    for index, column in enumerate(dataframe.columns, start=1):
+        letter = get_column_letter(index)
+        if column in NUMBER_COLUMNS:
+            for (cell,) in worksheet.iter_rows(
+                min_row=2, max_row=last_row, min_col=index, max_col=index
+            ):
+                cell.number_format = NUMBER_FORMAT
+        longest = max(
+            [len(str(column))]
+            + [len(f"{v:,.2f}" if column in NUMBER_COLUMNS and isinstance(v, (int, float)) else str(v))
+               for v in dataframe[column].dropna()]
+        )
+        # Extra room for the header's filter arrow.
+        worksheet.column_dimensions[letter].width = longest + 4
 
 
 def add_receipt_status_dropdown(worksheet, column_index, row_count):
@@ -92,6 +127,7 @@ def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel
     # Write both sheets
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         data_selected.to_excel(writer, sheet_name="Summary", index=False)
+        style_as_table(writer.sheets["Summary"], data_selected, "Transactions")
         add_receipt_status_dropdown(
             writer.sheets["Summary"],
             column_index=data_selected.columns.get_loc(RECEIPT_STATUS_COLUMN) + 1,
@@ -99,6 +135,7 @@ def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel
         )
         if not grouped_data.empty:
             grouped_data.to_excel(writer, sheet_name="Totals", index=False)
+            style_as_table(writer.sheets["Totals"], grouped_data, "VehicleTotals")
 
     return output_file
 

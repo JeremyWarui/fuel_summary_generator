@@ -6,6 +6,8 @@ A simple project using StreamLit for the purpose of generating a summary of a fu
 - **Summary**: every transaction, using the columns picked in the app, plus a final `Receipt_Status` column. Each cell in it has a dropdown that only accepts `Missing` or `Okay` (red and green). Cells start blank so you can mark receipts as you check them.
 - **Totals**: quantity and amount per vehicle (`Registration_num`) and product (`Product_or_Article`).
 
+Both sheets are Excel tables in the blue banded style (`TableStyleMedium2`) with filter arrows on the headers. `Quantity` and `Amount_incl_Tax` show as `#,##0.00`.
+
 ## Run
 
 ```

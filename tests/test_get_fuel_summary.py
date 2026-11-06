@@ -88,6 +88,38 @@ def test_missing_and_okay_are_colour_coded(tmp_path, invoice):
     assert formulas == ['$H2="Missing"', '$H2="Okay"']
 
 
+@pytest.mark.parametrize(
+    "sheet, table_name, ref",
+    [("Summary", "Transactions", "A1:H4"), ("Totals", "VehicleTotals", "A1:D3")],
+)
+def test_sheets_are_blue_banded_tables(tmp_path, invoice, sheet, table_name, ref):
+    ws = build(tmp_path, invoice)[sheet]
+    table = ws.tables[table_name]
+    assert table.ref == ref
+    assert table.tableStyleInfo.name == "TableStyleMedium2"
+    assert table.tableStyleInfo.showRowStripes is True
+    for cell in ws[1]:
+        assert not cell.font.b
+        assert cell.border.bottom is None or cell.border.bottom.style is None
+
+
+def test_empty_summary_table_keeps_one_body_row(tmp_path):
+    path = tmp_path / "empty.xlsx"
+    write_invoice(path, [])
+    ws = build(tmp_path, path)["Summary"]
+    assert ws.tables["Transactions"].ref == "A1:H2"
+
+
+def test_quantity_and_amount_show_two_decimals_with_thousands(tmp_path, invoice):
+    wb = build(tmp_path, invoice)
+    summary, totals = wb["Summary"], wb["Totals"]
+    assert summary["F2"].number_format == "#,##0.00"
+    assert summary["G2"].number_format == "#,##0.00"
+    assert totals["C2"].number_format == "#,##0.00"
+    assert totals["D3"].number_format == "#,##0.00"
+    assert summary["C2"].number_format == "General"
+
+
 def test_totals_sheet_has_no_receipt_status(tmp_path, invoice):
     wb = build(tmp_path, invoice)
     ws = wb["Totals"]
