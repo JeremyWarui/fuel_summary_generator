@@ -1,5 +1,54 @@
 import os
 import pandas as pd
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
+
+RECEIPT_STATUS_COLUMN = "Receipt_Status"
+RECEIPT_STATUS_OPTIONS = ("Missing", "Okay")
+
+
+def add_receipt_status_dropdown(worksheet, column_index, row_count):
+    """Restrict a column's data cells to a Missing/Okay dropdown and colour the choices.
+
+    column_index is 1-based. Blank cells stay allowed so unchecked receipts can stay empty.
+    """
+    letter = get_column_letter(column_index)
+    last_row = max(row_count + 1, 2)
+    cell_range = f"{letter}2:{letter}{last_row}"
+
+    validation = DataValidation(
+        type="list",
+        formula1='"' + ",".join(RECEIPT_STATUS_OPTIONS) + '"',
+        allow_blank=True,
+        showDropDown=False,
+        showErrorMessage=True,
+        errorTitle="Invalid receipt status",
+        error="Choose Missing or Okay from the list.",
+        showInputMessage=True,
+        promptTitle="Receipt status",
+        prompt="Is the receipt present? Choose Missing or Okay.",
+    )
+    validation.add(cell_range)
+    worksheet.add_data_validation(validation)
+
+    styles = {
+        "Missing": ("FFC7CE", "9C0006"),
+        "Okay": ("C6EFCE", "006100"),
+    }
+    for value, (fill, font) in styles.items():
+        worksheet.conditional_formatting.add(
+            cell_range,
+            FormulaRule(
+                formula=[f'${letter}2="{value}"'],
+                fill=PatternFill(start_color=fill, end_color=fill, fill_type="solid"),
+                font=Font(color=font),
+            ),
+        )
+
+    worksheet.column_dimensions[letter].width = max(len(RECEIPT_STATUS_COLUMN) + 2, 16)
+
 
 def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel_summary"):
     """
@@ -26,7 +75,8 @@ def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel
         data_file["Location"] = data_file["Location"].astype(str).str.title()
 
     # Select only user-requested columns (if they exist)
-    data_selected = data_file[selected_columns]
+    data_selected = data_file[selected_columns].copy()
+    data_selected[RECEIPT_STATUS_COLUMN] = ""
 
     # Try to create grouped summary if possible
     group_cols = [col for col in ["Registration_num", "Product_or_Article"] if col in data_file.columns]
@@ -40,8 +90,13 @@ def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel
     output_file = f"{output_name}.xlsx"
 
     # Write both sheets
-    with pd.ExcelWriter(output_file) as writer:
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         data_selected.to_excel(writer, sheet_name="Summary", index=False)
+        add_receipt_status_dropdown(
+            writer.sheets["Summary"],
+            column_index=data_selected.columns.get_loc(RECEIPT_STATUS_COLUMN) + 1,
+            row_count=len(data_selected),
+        )
         if not grouped_data.empty:
             grouped_data.to_excel(writer, sheet_name="Totals", index=False)
 
