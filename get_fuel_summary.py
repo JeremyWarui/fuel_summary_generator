@@ -1,14 +1,43 @@
 import os
+import re
 import pandas as pd
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.writer.theme import theme_xml
 
 RECEIPT_STATUS_COLUMN = "Receipt_Status"
 RECEIPT_STATUS_OPTIONS = ("Missing", "Okay")
-TABLE_STYLE = "TableStyleMedium2"
+# Accent 5 of the Office 2013+ theme: #5B9BD5 header, #DDEBF7 stripes.
+TABLE_STYLE = "TableStyleMedium6"
+OFFICE_2013_COLOURS = {
+    "dk2": "44546A",
+    "lt2": "E7E6E6",
+    "accent1": "4472C4",
+    "accent2": "ED7D31",
+    "accent3": "A5A5A5",
+    "accent4": "FFC000",
+    "accent5": "5B9BD5",
+    "accent6": "70AD47",
+    "hlink": "0563C1",
+    "folHlink": "954F72",
+}
+
+
+def office_2013_theme():
+    """Return openpyxl's theme XML with the Office 2013+ colour palette."""
+    xml = theme_xml
+    for slot, colour in OFFICE_2013_COLOURS.items():
+        xml, count = re.subn(
+            rf'(<a:{slot}>\s*<a:srgbClr val=")[0-9A-F]{{6}}(")',
+            rf"\g<1>{colour}\g<2>",
+            xml,
+        )
+        if count != 1:
+            raise ValueError(f"Theme slot {slot} not found exactly once")
+    return xml
 NUMBER_COLUMNS = ("Quantity", "Amount_incl_Tax")
 NUMBER_FORMAT = "#,##0.00"
 
@@ -126,6 +155,7 @@ def generate_custom_fuel_summary(input_file, selected_columns, output_name="fuel
 
     # Write both sheets
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        writer.book.loaded_theme = office_2013_theme()
         data_selected.to_excel(writer, sheet_name="Summary", index=False)
         style_as_table(writer.sheets["Summary"], data_selected, "Transactions")
         add_receipt_status_dropdown(

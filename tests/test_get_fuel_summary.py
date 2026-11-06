@@ -1,3 +1,6 @@
+import re
+import zipfile
+
 import pandas as pd
 import pytest
 from openpyxl import load_workbook
@@ -96,7 +99,7 @@ def test_sheets_are_blue_banded_tables(tmp_path, invoice, sheet, table_name, ref
     ws = build(tmp_path, invoice)[sheet]
     table = ws.tables[table_name]
     assert table.ref == ref
-    assert table.tableStyleInfo.name == "TableStyleMedium2"
+    assert table.tableStyleInfo.name == "TableStyleMedium6"
     assert table.tableStyleInfo.showRowStripes is True
     for cell in ws[1]:
         assert not cell.font.b
@@ -132,3 +135,11 @@ def test_totals_sheet_has_no_receipt_status(tmp_path, invoice):
     }
     assert totals[("KAA 123A", "Diesel")] == pytest.approx(60.5)
     assert totals[("KBB 456B", "Super")] == pytest.approx(15.25)
+
+
+def test_workbook_uses_office_2013_blue_palette(tmp_path, invoice):
+    out = generate_custom_fuel_summary(str(invoice), SELECTED, str(tmp_path / "report"))
+    theme = zipfile.ZipFile(out).read("xl/theme/theme1.xml").decode()
+    assert re.search(r'<a:accent5>\s*<a:srgbClr val="5B9BD5"', theme)
+    assert re.search(r'<a:accent1>\s*<a:srgbClr val="4472C4"', theme)
+    assert "4BACC6" not in theme
